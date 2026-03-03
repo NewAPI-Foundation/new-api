@@ -872,6 +872,20 @@ const EditChannelModal = (props) => {
           data.vertex_key_type = parsedSettings.vertex_key_type || 'json';
           // 读取 AWS 密钥格式和区域
           data.aws_key_type = parsedSettings.aws_key_type || 'ak_sk';
+          // 读取 Header 值过滤配置
+          if (parsedSettings.header_filter_values && typeof parsedSettings.header_filter_values === 'object') {
+            const keys = Object.keys(parsedSettings.header_filter_values);
+            if (keys.length > 0) {
+              data.header_filter_key = keys[0];
+              data.header_filter_values_list = parsedSettings.header_filter_values[keys[0]] || [];
+            } else {
+              data.header_filter_key = '';
+              data.header_filter_values_list = [];
+            }
+          } else {
+            data.header_filter_key = '';
+            data.header_filter_values_list = [];
+          }
           // 读取企业账户设置
           data.is_enterprise_account =
             parsedSettings.openrouter_enterprise === true;
@@ -907,6 +921,8 @@ const EditChannelModal = (props) => {
           data.region = '';
           data.vertex_key_type = 'json';
           data.aws_key_type = 'ak_sk';
+          data.header_filter_key = '';
+          data.header_filter_values_list = [];
           data.is_enterprise_account = false;
           data.allow_service_tier = false;
           data.disable_store = false;
@@ -924,6 +940,8 @@ const EditChannelModal = (props) => {
         // 兼容历史数据：老渠道没有 settings 时，默认按 json 展示
         data.vertex_key_type = 'json';
         data.aws_key_type = 'ak_sk';
+        data.header_filter_key = '';
+        data.header_filter_values_list = [];
         data.is_enterprise_account = false;
         data.allow_service_tier = false;
         data.disable_store = false;
@@ -1709,9 +1727,18 @@ const EditChannelModal = (props) => {
         localInputs.is_enterprise_account === true;
     }
 
-    // type === 33 (AWS): 保存 aws_key_type 到 settings
+    // type === 33 (AWS): 保存 aws_key_type 和 header_filter_values 到 settings
     if (localInputs.type === 33) {
       settings.aws_key_type = localInputs.aws_key_type || 'ak_sk';
+      const filterKey = (localInputs.header_filter_key || '').trim();
+      const filterValues = Array.isArray(localInputs.header_filter_values_list)
+        ? localInputs.header_filter_values_list.filter((v) => v && v.trim())
+        : [];
+      if (filterKey && filterValues.length > 0) {
+        settings.header_filter_values = { [filterKey]: filterValues };
+      } else {
+        delete settings.header_filter_values;
+      }
     }
 
     // type === 41 (Vertex): 始终保存 vertex_key_type 到 settings，避免编辑时被重置
@@ -1775,6 +1802,8 @@ const EditChannelModal = (props) => {
     delete localInputs.vertex_key_type;
     // 顶层的 aws_key_type 不应发送给后端
     delete localInputs.aws_key_type;
+    delete localInputs.header_filter_key;
+    delete localInputs.header_filter_values_list;
     // 清理字段透传控制的临时字段
     delete localInputs.allow_service_tier;
     delete localInputs.disable_store;
@@ -2291,6 +2320,35 @@ const EditChannelModal = (props) => {
                           }}
                           extraText={t(
                             'AK/SK 模式：使用 AccessKey 和 SecretAccessKey；API Key 模式：使用 API Key',
+                          )}
+                        />
+                        <Form.Input
+                          field='header_filter_key'
+                          label={t('Header 值过滤 - Header 名称')}
+                          placeholder='anthropic-beta'
+                          style={{ width: '100%' }}
+                          value={inputs.header_filter_key || ''}
+                          onChange={(value) =>
+                            handleInputChange('header_filter_key', value)
+                          }
+                          showClear
+                          extraText={t(
+                            '请求转发时，从该 Header 中移除下方配置的值（多个值以逗号分隔的 Header）',
+                          )}
+                        />
+                        <Form.TagInput
+                          field='header_filter_values_list'
+                          label={t('Header 值过滤 - 要过滤的值')}
+                          placeholder={t('输入后按回车添加，例如：prompt-caching-scope-2026-01-05')}
+                          style={{ width: '100%' }}
+                          value={inputs.header_filter_values_list || []}
+                          addOnBlur
+                          showClear
+                          onChange={(values) =>
+                            handleInputChange('header_filter_values_list', values || [])
+                          }
+                          extraText={t(
+                            '配置后，当请求包含指定 Header 时，会从中移除这些值再转发到上游',
                           )}
                         />
                       </>

@@ -108,7 +108,37 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *rel
 	if a.ClientMode == ClientModeApiKey {
 		req.Set("Authorization", "Bearer "+info.ApiKey)
 	}
+	applyHeaderFilter(req, info.ChannelOtherSettings)
 	return nil
+}
+
+func applyHeaderFilter(header *http.Header, settings dto.ChannelOtherSettings) {
+	if len(settings.HeaderFilterValues) == 0 {
+		return
+	}
+	for headerKey, filterValues := range settings.HeaderFilterValues {
+		currentValue := header.Get(headerKey)
+		if currentValue == "" {
+			continue
+		}
+		filterSet := make(map[string]bool, len(filterValues))
+		for _, v := range filterValues {
+			filterSet[strings.TrimSpace(v)] = true
+		}
+		parts := strings.Split(currentValue, ",")
+		filtered := make([]string, 0, len(parts))
+		for _, part := range parts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed != "" && !filterSet[trimmed] {
+				filtered = append(filtered, trimmed)
+			}
+		}
+		if len(filtered) > 0 {
+			header.Set(headerKey, strings.Join(filtered, ","))
+		} else {
+			header.Del(headerKey)
+		}
+	}
 }
 
 func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayInfo, request *dto.GeneralOpenAIRequest) (any, error) {
