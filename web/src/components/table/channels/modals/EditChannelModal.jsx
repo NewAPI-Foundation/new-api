@@ -872,6 +872,12 @@ const EditChannelModal = (props) => {
           data.vertex_key_type = parsedSettings.vertex_key_type || 'json';
           // 读取 AWS 密钥格式和区域
           data.aws_key_type = parsedSettings.aws_key_type || 'ak_sk';
+          // 读取 Header 值过滤配置
+          if (parsedSettings.header_filter_values && typeof parsedSettings.header_filter_values === 'object' && Object.keys(parsedSettings.header_filter_values).length > 0) {
+            data.header_filter_values = JSON.stringify(parsedSettings.header_filter_values, null, 2);
+          } else {
+            data.header_filter_values = '';
+          }
           // 读取企业账户设置
           data.is_enterprise_account =
             parsedSettings.openrouter_enterprise === true;
@@ -907,6 +913,7 @@ const EditChannelModal = (props) => {
           data.region = '';
           data.vertex_key_type = 'json';
           data.aws_key_type = 'ak_sk';
+          data.header_filter_values = '';
           data.is_enterprise_account = false;
           data.allow_service_tier = false;
           data.disable_store = false;
@@ -924,6 +931,7 @@ const EditChannelModal = (props) => {
         // 兼容历史数据：老渠道没有 settings 时，默认按 json 展示
         data.vertex_key_type = 'json';
         data.aws_key_type = 'ak_sk';
+        data.header_filter_values = '';
         data.is_enterprise_account = false;
         data.allow_service_tier = false;
         data.disable_store = false;
@@ -1714,6 +1722,25 @@ const EditChannelModal = (props) => {
       settings.aws_key_type = localInputs.aws_key_type || 'ak_sk';
     }
 
+    // type === 1 (OpenAI) 或 type === 33 (AWS): 保存 header_filter_values
+    if (localInputs.type === 1 || localInputs.type === 33) {
+      if (localInputs.header_filter_values && localInputs.header_filter_values.trim()) {
+        try {
+          const parsed = JSON.parse(localInputs.header_filter_values);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            settings.header_filter_values = parsed;
+          } else {
+            delete settings.header_filter_values;
+          }
+        } catch (e) {
+          showError(t('Header 值过滤 JSON 格式错误') + ': ' + e.message);
+          return;
+        }
+      } else {
+        delete settings.header_filter_values;
+      }
+    }
+
     // type === 41 (Vertex): 始终保存 vertex_key_type 到 settings，避免编辑时被重置
     if (localInputs.type === 41) {
       settings.vertex_key_type = localInputs.vertex_key_type || 'json';
@@ -1775,6 +1802,7 @@ const EditChannelModal = (props) => {
     delete localInputs.vertex_key_type;
     // 顶层的 aws_key_type 不应发送给后端
     delete localInputs.aws_key_type;
+    delete localInputs.header_filter_values;
     // 清理字段透传控制的临时字段
     delete localInputs.allow_service_tier;
     delete localInputs.disable_store;
@@ -2294,6 +2322,61 @@ const EditChannelModal = (props) => {
                           )}
                         />
                       </>
+                    )}
+
+                    {(inputs.type === 1 || inputs.type === 33) && (
+                      <Form.TextArea
+                        field='header_filter_values'
+                        label={t('Header 值过滤')}
+                        placeholder={
+                          t('此项可选，用于过滤请求头中的指定值，Key 为 Header 名称，Value 为要过滤的值列表') +
+                          '\n' +
+                          t('格式示例：') +
+                          '\n' +
+                          JSON.stringify(
+                            { 'anthropic-beta': ['prompt-caching-scope-2026-01-05', 'structured-outputs-2025-12-15'] },
+                            null,
+                            2,
+                          )
+                        }
+                        autosize
+                        onChange={(value) =>
+                          handleInputChange('header_filter_values', value)
+                        }
+                        extraText={
+                          <div className='flex gap-2 flex-wrap items-center'>
+                            <Text
+                              className='!text-semi-color-primary cursor-pointer'
+                              onClick={() =>
+                                handleInputChange(
+                                  'header_filter_values',
+                                  JSON.stringify(
+                                    {
+                                      'anthropic-beta': [
+                                        'prompt-caching-scope-2026-01-05',
+                                        'structured-outputs-2025-12-15',
+                                        'oauth-2025-04-20',
+                                        'output-128k-2025-02-19',
+                                      ],
+                                    },
+                                    null,
+                                    2,
+                                  ),
+                                )
+                              }
+                            >
+                              {t('填入模板')}
+                            </Text>
+                            <Text
+                              className='!text-semi-color-primary cursor-pointer'
+                              onClick={() => formatJsonField('header_filter_values')}
+                            >
+                              {t('格式化')}
+                            </Text>
+                          </div>
+                        }
+                        showClear
+                      />
                     )}
 
                     {inputs.type === 41 && (
