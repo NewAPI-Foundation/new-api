@@ -114,7 +114,7 @@ func doAwsClientRequest(c *gin.Context, info *relaycommon.RelayInfo, a *Adaptor,
 	for key, value := range headerOverride {
 		requestHeader.Set(key, value)
 	}
-	applyHeaderFilter(&requestHeader, info.ChannelOtherSettings)
+	channel.ApplyHeaderFilter(&requestHeader, info.ChannelOtherSettings.HeaderFilterValues)
 
 	if isNovaModel(awsModelId) {
 		var novaReq *NovaRequest

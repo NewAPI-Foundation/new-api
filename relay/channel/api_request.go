@@ -284,6 +284,35 @@ func applyHeaderOverrideToRequest(req *http.Request, headerOverride map[string]s
 	}
 }
 
+func ApplyHeaderFilter(header *http.Header, filterValues map[string][]string) {
+	if len(filterValues) == 0 {
+		return
+	}
+	for headerKey, vals := range filterValues {
+		currentValue := header.Get(headerKey)
+		if currentValue == "" {
+			continue
+		}
+		filterSet := make(map[string]bool, len(vals))
+		for _, v := range vals {
+			filterSet[strings.TrimSpace(v)] = true
+		}
+		parts := strings.Split(currentValue, ",")
+		filtered := make([]string, 0, len(parts))
+		for _, part := range parts {
+			trimmed := strings.TrimSpace(part)
+			if trimmed != "" && !filterSet[trimmed] {
+				filtered = append(filtered, trimmed)
+			}
+		}
+		if len(filtered) > 0 {
+			header.Set(headerKey, strings.Join(filtered, ","))
+		} else {
+			header.Del(headerKey)
+		}
+	}
+}
+
 func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Response, error) {
 	fullRequestURL, err := a.GetRequestURL(info)
 	if err != nil {
@@ -308,6 +337,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, err
 	}
 	applyHeaderOverrideToRequest(req, headerOverride)
+	ApplyHeaderFilter(&req.Header, info.ChannelOtherSettings.HeaderFilterValues)
 	resp, err := doRequest(c, req, info)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)

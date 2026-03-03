@@ -873,18 +873,10 @@ const EditChannelModal = (props) => {
           // 读取 AWS 密钥格式和区域
           data.aws_key_type = parsedSettings.aws_key_type || 'ak_sk';
           // 读取 Header 值过滤配置
-          if (parsedSettings.header_filter_values && typeof parsedSettings.header_filter_values === 'object') {
-            const keys = Object.keys(parsedSettings.header_filter_values);
-            if (keys.length > 0) {
-              data.header_filter_key = keys[0];
-              data.header_filter_values_list = parsedSettings.header_filter_values[keys[0]] || [];
-            } else {
-              data.header_filter_key = '';
-              data.header_filter_values_list = [];
-            }
+          if (parsedSettings.header_filter_values && typeof parsedSettings.header_filter_values === 'object' && Object.keys(parsedSettings.header_filter_values).length > 0) {
+            data.header_filter_values = JSON.stringify(parsedSettings.header_filter_values, null, 2);
           } else {
-            data.header_filter_key = '';
-            data.header_filter_values_list = [];
+            data.header_filter_values = '';
           }
           // 读取企业账户设置
           data.is_enterprise_account =
@@ -921,8 +913,7 @@ const EditChannelModal = (props) => {
           data.region = '';
           data.vertex_key_type = 'json';
           data.aws_key_type = 'ak_sk';
-          data.header_filter_key = '';
-          data.header_filter_values_list = [];
+          data.header_filter_values = '';
           data.is_enterprise_account = false;
           data.allow_service_tier = false;
           data.disable_store = false;
@@ -940,8 +931,7 @@ const EditChannelModal = (props) => {
         // 兼容历史数据：老渠道没有 settings 时，默认按 json 展示
         data.vertex_key_type = 'json';
         data.aws_key_type = 'ak_sk';
-        data.header_filter_key = '';
-        data.header_filter_values_list = [];
+        data.header_filter_values = '';
         data.is_enterprise_account = false;
         data.allow_service_tier = false;
         data.disable_store = false;
@@ -1727,15 +1717,25 @@ const EditChannelModal = (props) => {
         localInputs.is_enterprise_account === true;
     }
 
-    // type === 33 (AWS): 保存 aws_key_type 和 header_filter_values 到 settings
+    // type === 33 (AWS): 保存 aws_key_type 到 settings
     if (localInputs.type === 33) {
       settings.aws_key_type = localInputs.aws_key_type || 'ak_sk';
-      const filterKey = (localInputs.header_filter_key || '').trim();
-      const filterValues = Array.isArray(localInputs.header_filter_values_list)
-        ? localInputs.header_filter_values_list.filter((v) => v && v.trim())
-        : [];
-      if (filterKey && filterValues.length > 0) {
-        settings.header_filter_values = { [filterKey]: filterValues };
+    }
+
+    // type === 1 (OpenAI) 或 type === 33 (AWS): 保存 header_filter_values
+    if (localInputs.type === 1 || localInputs.type === 33) {
+      if (localInputs.header_filter_values && localInputs.header_filter_values.trim()) {
+        try {
+          const parsed = JSON.parse(localInputs.header_filter_values);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            settings.header_filter_values = parsed;
+          } else {
+            delete settings.header_filter_values;
+          }
+        } catch (e) {
+          showError(t('Header 值过滤 JSON 格式错误') + ': ' + e.message);
+          return;
+        }
       } else {
         delete settings.header_filter_values;
       }
@@ -1802,8 +1802,7 @@ const EditChannelModal = (props) => {
     delete localInputs.vertex_key_type;
     // 顶层的 aws_key_type 不应发送给后端
     delete localInputs.aws_key_type;
-    delete localInputs.header_filter_key;
-    delete localInputs.header_filter_values_list;
+    delete localInputs.header_filter_values;
     // 清理字段透传控制的临时字段
     delete localInputs.allow_service_tier;
     delete localInputs.disable_store;
@@ -2322,36 +2321,62 @@ const EditChannelModal = (props) => {
                             'AK/SK 模式：使用 AccessKey 和 SecretAccessKey；API Key 模式：使用 API Key',
                           )}
                         />
-                        <Form.Input
-                          field='header_filter_key'
-                          label={t('Header 值过滤 - Header 名称')}
-                          placeholder='anthropic-beta'
-                          style={{ width: '100%' }}
-                          value={inputs.header_filter_key || ''}
-                          onChange={(value) =>
-                            handleInputChange('header_filter_key', value)
-                          }
-                          showClear
-                          extraText={t(
-                            '请求转发时，从该 Header 中移除下方配置的值（多个值以逗号分隔的 Header）',
-                          )}
-                        />
-                        <Form.TagInput
-                          field='header_filter_values_list'
-                          label={t('Header 值过滤 - 要过滤的值')}
-                          placeholder={t('输入后按回车添加，例如：prompt-caching-scope-2026-01-05')}
-                          style={{ width: '100%' }}
-                          value={inputs.header_filter_values_list || []}
-                          addOnBlur
-                          showClear
-                          onChange={(values) =>
-                            handleInputChange('header_filter_values_list', values || [])
-                          }
-                          extraText={t(
-                            '配置后，当请求包含指定 Header 时，会从中移除这些值再转发到上游',
-                          )}
-                        />
                       </>
+                    )}
+
+                    {(inputs.type === 1 || inputs.type === 33) && (
+                      <Form.TextArea
+                        field='header_filter_values'
+                        label={t('Header 值过滤')}
+                        placeholder={
+                          t('此项可选，用于过滤请求头中的指定值，Key 为 Header 名称，Value 为要过滤的值列表') +
+                          '\n' +
+                          t('格式示例：') +
+                          '\n' +
+                          JSON.stringify(
+                            { 'anthropic-beta': ['prompt-caching-scope-2026-01-05', 'structured-outputs-2025-12-15'] },
+                            null,
+                            2,
+                          )
+                        }
+                        autosize
+                        onChange={(value) =>
+                          handleInputChange('header_filter_values', value)
+                        }
+                        extraText={
+                          <div className='flex gap-2 flex-wrap items-center'>
+                            <Text
+                              className='!text-semi-color-primary cursor-pointer'
+                              onClick={() =>
+                                handleInputChange(
+                                  'header_filter_values',
+                                  JSON.stringify(
+                                    {
+                                      'anthropic-beta': [
+                                        'prompt-caching-scope-2026-01-05',
+                                        'structured-outputs-2025-12-15',
+                                        'oauth-2025-04-20',
+                                        'output-128k-2025-02-19',
+                                      ],
+                                    },
+                                    null,
+                                    2,
+                                  ),
+                                )
+                              }
+                            >
+                              {t('填入模板')}
+                            </Text>
+                            <Text
+                              className='!text-semi-color-primary cursor-pointer'
+                              onClick={() => formatJsonField('header_filter_values')}
+                            >
+                              {t('格式化')}
+                            </Text>
+                          </div>
+                        }
+                        showClear
+                      />
                     )}
 
                     {inputs.type === 41 && (
