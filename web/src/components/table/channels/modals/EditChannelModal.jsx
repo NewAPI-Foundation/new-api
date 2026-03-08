@@ -878,6 +878,11 @@ const EditChannelModal = (props) => {
           } else {
             data.header_filter_values = '';
           }
+          if (parsedSettings.header_append_values && typeof parsedSettings.header_append_values === 'object' && Object.keys(parsedSettings.header_append_values).length > 0) {
+            data.header_append_values = JSON.stringify(parsedSettings.header_append_values, null, 2);
+          } else {
+            data.header_append_values = '';
+          }
           // 读取企业账户设置
           data.is_enterprise_account =
             parsedSettings.openrouter_enterprise === true;
@@ -914,6 +919,7 @@ const EditChannelModal = (props) => {
           data.vertex_key_type = 'json';
           data.aws_key_type = 'ak_sk';
           data.header_filter_values = '';
+          data.header_append_values = '';
           data.is_enterprise_account = false;
           data.allow_service_tier = false;
           data.disable_store = false;
@@ -932,6 +938,7 @@ const EditChannelModal = (props) => {
         data.vertex_key_type = 'json';
         data.aws_key_type = 'ak_sk';
         data.header_filter_values = '';
+        data.header_append_values = '';
         data.is_enterprise_account = false;
         data.allow_service_tier = false;
         data.disable_store = false;
@@ -1739,6 +1746,21 @@ const EditChannelModal = (props) => {
       } else {
         delete settings.header_filter_values;
       }
+      if (localInputs.header_append_values && localInputs.header_append_values.trim()) {
+        try {
+          const parsed = JSON.parse(localInputs.header_append_values);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            settings.header_append_values = parsed;
+          } else {
+            delete settings.header_append_values;
+          }
+        } catch (e) {
+          showError(t('Header 值追加 JSON 格式错误') + ': ' + e.message);
+          return;
+        }
+      } else {
+        delete settings.header_append_values;
+      }
     }
 
     // type === 41 (Vertex): 始终保存 vertex_key_type 到 settings，避免编辑时被重置
@@ -1803,6 +1825,7 @@ const EditChannelModal = (props) => {
     // 顶层的 aws_key_type 不应发送给后端
     delete localInputs.aws_key_type;
     delete localInputs.header_filter_values;
+    delete localInputs.header_append_values;
     // 清理字段透传控制的临时字段
     delete localInputs.allow_service_tier;
     delete localInputs.disable_store;
@@ -2370,6 +2393,58 @@ const EditChannelModal = (props) => {
                             <Text
                               className='!text-semi-color-primary cursor-pointer'
                               onClick={() => formatJsonField('header_filter_values')}
+                            >
+                              {t('格式化')}
+                            </Text>
+                          </div>
+                        }
+                        showClear
+                      />
+                    )}
+
+                    {(inputs.type === 1 || inputs.type === 33) && (
+                      <Form.TextArea
+                        field='header_append_values'
+                        label={t('Header 值追加')}
+                        placeholder={
+                          t('此项可选，用于向请求头追加指定值，Key 为 Header 名称，Value 为要追加的值列表') +
+                          '\n' +
+                          t('格式示例：') +
+                          '\n' +
+                          JSON.stringify(
+                            { 'anthropic-beta': ['interleaved-thinking-2025-05-14'] },
+                            null,
+                            2,
+                          )
+                        }
+                        autosize
+                        onChange={(value) =>
+                          handleInputChange('header_append_values', value)
+                        }
+                        extraText={
+                          <div className='flex gap-2 flex-wrap items-center'>
+                            <Text
+                              className='!text-semi-color-primary cursor-pointer'
+                              onClick={() =>
+                                handleInputChange(
+                                  'header_append_values',
+                                  JSON.stringify(
+                                    {
+                                      'anthropic-beta': [
+                                        'interleaved-thinking-2025-05-14',
+                                      ],
+                                    },
+                                    null,
+                                    2,
+                                  ),
+                                )
+                              }
+                            >
+                              {t('填入模板')}
+                            </Text>
+                            <Text
+                              className='!text-semi-color-primary cursor-pointer'
+                              onClick={() => formatJsonField('header_append_values')}
                             >
                               {t('格式化')}
                             </Text>

@@ -287,6 +287,39 @@ func applyHeaderOverrideToRequest(req *http.Request, headerOverride map[string]s
 	}
 }
 
+func ApplyHeaderAppend(header *http.Header, appendValues map[string][]string) {
+	if len(appendValues) == 0 {
+		return
+	}
+	for headerKey, vals := range appendValues {
+		currentValue := header.Get(headerKey)
+		existing := make(map[string]bool)
+		if currentValue != "" {
+			for _, part := range strings.Split(currentValue, ",") {
+				trimmed := strings.TrimSpace(part)
+				if trimmed != "" {
+					existing[trimmed] = true
+				}
+			}
+		}
+		var toAdd []string
+		for _, v := range vals {
+			trimmed := strings.TrimSpace(v)
+			if trimmed != "" && !existing[trimmed] {
+				toAdd = append(toAdd, trimmed)
+				existing[trimmed] = true
+			}
+		}
+		if len(toAdd) > 0 {
+			if currentValue != "" {
+				header.Set(headerKey, currentValue+","+strings.Join(toAdd, ","))
+			} else {
+				header.Set(headerKey, strings.Join(toAdd, ","))
+			}
+		}
+	}
+}
+
 func ApplyHeaderFilter(header *http.Header, filterValues map[string][]string) {
 	if len(filterValues) == 0 {
 		return
@@ -340,6 +373,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, err
 	}
 	applyHeaderOverrideToRequest(req, headerOverride)
+	ApplyHeaderAppend(&req.Header, info.ChannelOtherSettings.HeaderAppendValues)
 	ApplyHeaderFilter(&req.Header, info.ChannelOtherSettings.HeaderFilterValues)
 	resp, err := doRequest(c, req, info)
 	if err != nil {
