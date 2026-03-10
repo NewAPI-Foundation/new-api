@@ -366,8 +366,8 @@ export const useLogsData = () => {
 
       if (isAdminUser && (logs[i].type === 0 || logs[i].type === 2 || logs[i].type === 6)) {
         expandDataLocal.push({
-          key: t('渠道信息'),
-          value: `${logs[i].channel} - ${logs[i].channel_name || '[未知]'}`,
+          key: t('渠道'),
+          value: `${logs[i].channel}`,
         });
       }
       if (logs[i].request_id) {
