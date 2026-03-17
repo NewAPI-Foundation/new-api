@@ -12,6 +12,8 @@ web/dist
 .env
 one-api
 new-api
+new-api-server
+nohup.out
 /__debug_bin*
 .DS_Store
 tiktoken_cache

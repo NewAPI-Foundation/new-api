@@ -1,10 +1,50 @@
+# Git & IDE
 .github
 .git
+.gitignore
+.gitattributes
 *.md
 .vscode
-.gitignore
+.idea
+.zed
+.history
+.DS_Store
+
+# Build / runtime (not needed in image build)
 Makefile
 docs
-.eslintcache
+logs
+upload
+data
+plans
+*.db
+*.db-journal
+*.exe
+build
+tiktoken_cache
+one-api
+new-api
+new-api-server
+/__debug_bin*
+
+# Frontend: node_modules 在镜像内 bun install，dist 在镜像内 build
+web/node_modules
+web/dist
+
+# Go cache（镜像内 go mod download）
 .gocache
-/web/node_modules
+.gomodcache
+.gomodcache/
+.cache
+.gocache-temp
+.gopath
+.eslintcache
+
+# Electron（镜像不构建 electron）
+electron/node_modules
+electron/dist
+
+# 敏感/本地配置（不要打进镜像）
+.env
+.env.*
+!.env.example

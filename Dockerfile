@@ -27,7 +27,18 @@ RUN go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$
 
 FROM debian:bookworm-slim
 
-RUN apt-get update \
+# 禁止交互，避免 debconf 卡住不输出
+ENV DEBIAN_FRONTEND=noninteractive
+
+# 若 apt 拉取慢，可指定国内镜像加速，例如:
+#   docker build --build-arg APT_MIRROR=mirrors.aliyun.com ...
+ARG APT_MIRROR=
+RUN set -eux; \
+    if [ -n "$APT_MIRROR" ]; then \
+      echo "deb http://${APT_MIRROR}/debian bookworm main" > /etc/apt/sources.list; \
+      echo "deb http://${APT_MIRROR}/debian-security bookworm-security main" >> /etc/apt/sources.list; \
+    fi; \
+    apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
     && rm -rf /var/lib/apt/lists/* \
     && update-ca-certificates
